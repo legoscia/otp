@@ -3,14 +3,15 @@
 ===========================================================================
 
 Please read the whole file before attempting to build and install Erlang.
-You can find more information about OpenSource Erlang at
+You can find more information about Open Source Erlang at:
 
     http://www.erlang.org/
 
-The source code for Erlang/OTP can also be found in a Git
-repository at
+The source code for Erlang/OTP can also be found in a Git repository:
 
     http://github.com/erlang/otp
+
+%CopyrightBegin%
 
 Copyright Ericsson AB 1998-2009. All Rights Reserved.
 
@@ -24,6 +25,8 @@ Software distributed under the License is distributed on an "AS IS"
 basis, WITHOUT WARRANTY OF ANY KIND, either express or implied. See
 the License for the specific language governing rights and limitations
 under the License.
+
+%CopyrightEnd%
 
 Portability
 -----------
