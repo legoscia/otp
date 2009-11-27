@@ -267,8 +267,9 @@ If you or your system has special requirements please read the
 Makefile for additional configuration information.
 
 
-How to build an debug enabled Erlang runtime system
----------------------------------------------------
+How to build a debug enabled Erlang runtime system
+--------------------------------------------------
+
 After completing all the normal building steps described above a debug
 enabled runtime system can be built. To do this you have to change 
 directory to $ERL_TOP/erts/emulator.
@@ -277,7 +278,7 @@ In this directory execute:
 
 	make debug FLAVOR=$FLAVOR
 
-where $FLAVOR is either a plain or smp option. The flavor options will 
+where $FLAVOR is either "plain" or "smp". The flavor options will 
 produce a beam.debug and beam.smp.debug executable respectively. The 
 files are installed along side with the normal (opt) versions beam.smp 
 and beam.
