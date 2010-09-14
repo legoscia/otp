@@ -1310,6 +1310,17 @@ Other commands:
   (if (boundp 'after-change-major-mode-hook)
       (run-hooks 'after-change-major-mode-hook)))
 
+(defvar erlang-dollar-syntax-class "/")
+
+(defun erlang-set-dollar-syntax-class (class)
+  (interactive "sNew syntax class for $: ")
+  (setq erlang-dollar-syntax-class class)
+  (setq erlang-mode-syntax-table nil)
+  ;; change in all erlang mode buffers
+  (dolist (buffer (buffer-list))
+    (with-current-buffer buffer
+      (when (eq major-mode 'erlang-mode)
+        (erlang-mode)))))
 
 (defun erlang-syntax-table-init ()
   (if (null erlang-mode-syntax-table)
@@ -1322,6 +1333,7 @@ Other commands:
 	(modify-syntax-entry ?$ "/" table)    ;; Misses the corner case "string that ends with $" 
 	                                      ;; we have to live with that for now..it is the best alternative
 	                                      ;; that can be worked around with "string hat ends with \$" 
+        (modify-syntax-entry ?$ erlang-dollar-syntax-class table) ;XXX
 	(modify-syntax-entry ?% "<" table)
 	(modify-syntax-entry ?& "." table)
 	(modify-syntax-entry ?\' "\"" table)
