@@ -133,6 +133,7 @@ static void exec_shell(char **);
 static void status(const char *format,...);
 static void error_logf(int priority, int line, const char *format,...);
 static void catch_sigchild(int);
+static void exit_with_exit_status(void);
 static int next_log(int log_num);
 static int prev_log(int log_num);
 static int find_next_log_num(void);
@@ -171,6 +172,9 @@ static int run_daemon = 0;
 static char *program_name;
 static int mfd; /* master pty fd */
 static unsigned protocol_ver = RUN_ERL_LO_VER; /* assume lowest to begin with */
+static int exit_status;
+static int have_exit_status = 0;
+static int want_to_exit = 0;
 
 /*
  * Output buffer.
@@ -482,8 +486,7 @@ static void pass_on(pid_t childpid)
     
     /* Enter the work loop */
     
-    while (1) {
-	int exit_status;
+    while (!want_to_exit) {
 	maxfd = MAX(rfd, mfd);
 	maxfd = MAX(wfd, maxfd);
 	FD_ZERO(&readfds);
@@ -497,17 +500,26 @@ static void pass_on(pid_t childpid)
 	    writefds_ptr = &writefds;
 	}
 	time(&last_activity);
-	timeout.tv_sec  = log_alive_minutes*60; /* don't assume old BSD bug */
+	if (have_exit_status) {
+	    /*
+	     * The Erlang emulator has terminated. Give us some more
+	     * time to write out any pending data before we terminate too.
+	     */
+	    timeout.tv_sec = 5;
+	} else {
+	    timeout.tv_sec  = log_alive_minutes*60; /* don't assume old BSD bug */
+	}
 	timeout.tv_usec = 0;
 	ready = select(maxfd + 1, &readfds, writefds_ptr, NULL, &timeout);
+	if (have_exit_status) {
+	    /* We waited five seconds; that should be enough... */
+	    want_to_exit = 1;
+	}
+
 	if (ready < 0) {
 	    if (errno == EINTR) {
 		if (waitpid(childpid, &exit_status, WNOHANG) == childpid) {
-		    /*
-		     * The Erlang emulator has terminated. Give us some more
-		     * time to write out any pending data before we terminate too.
-		     */
-		    alarm(5);
+		    have_exit_status = 1;
 		}
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
@@ -520,7 +532,7 @@ static void pass_on(pid_t childpid)
 	    time_t now;
 
 	    if (waitpid(childpid, &exit_status, WNOHANG) == childpid) {
-		alarm(5);
+		have_exit_status = 1;
 		FD_ZERO(&readfds);
 		FD_ZERO(&writefds);
 	    }
@@ -596,9 +608,15 @@ static void pass_on(pid_t childpid)
 			ERROR0(LOG_ERR,"Erlang closed the connection.");
 		    else
 			ERRNO_ERR0(LOG_ERR,"Error in reading from terminal");
-		    exit(1);
+		    if (have_exit_status)
+			exit_with_exit_status();
+		    else
+			exit(1);
 		}
-		exit(0);
+		if (have_exit_status)
+		    exit_with_exit_status();
+		else
+		    exit(0);
 	    }
 
 	    write_to_log(&lfd, &lognum, buf, len);
@@ -694,10 +712,26 @@ static void pass_on(pid_t childpid)
 #endif
 	}
     }
+    /* We can only get here if have_exit_status is 1 */
+    exit_with_exit_status();
 } /* pass_on() */
 
 static void catch_sigchild(int sig)
 {
+}
+
+static void exit_with_exit_status()
+{
+  if (WIFEXITED(exit_status)) {
+    exit(WEXITSTATUS(exit_status));
+  }
+  else if (WIFSIGNALED(exit_status)) {
+    exit(WTERMSIG(exit_status));
+  }
+  else {
+    /* ??? */
+    exit(-1);
+  }
 }
 
 /*
