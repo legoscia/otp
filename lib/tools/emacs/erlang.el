@@ -479,6 +479,24 @@ When nil, indent to the column after the `(' of the
 function.")
 (put 'erlang-argument-indent 'safe-local-variable '(lambda (val) (or (null val) (integerp val))))
 
+(defvar erlang-indent-arguments-from-line-start nil
+  "*If non-nil, `erlang-argument-indent' applies from start of previous line.
+Otherwise, it applies from the start of the function name.
+
+That is, for an `erlang-argument-indent' of 8, setting this
+variable to t will get you this:
+
+case myfunction(
+        bar) of
+     ...
+
+instead of this:
+
+case myfunction(
+             bar) of
+     ...")
+(put 'erlang-indent-arguments-from-line-start 'safe-local-variable 'booleanp)
+
 (defvar erlang-tab-always-indent t
   "*Non-nil means TAB in Erlang mode should always re-indent the current line,
 regardless of where in the line point is when the TAB command is used.")
@@ -2727,10 +2745,12 @@ Return nil if inside string, t if in a comment."
 		  (goto-char (nth 1 stack-top))
 		  (cond ((looking-at "[({]\\s *\\($\\|%\\)")
 		   	 ;; Line ends with parenthesis.
-			 (let ((previous (erlang-indent-find-preceding-expr))
-			       (stack-pos (nth 2 stack-top)))
-			   (if (>= previous stack-pos) stack-pos
-			     (- (+ previous erlang-argument-indent) 1))))
+			 (if erlang-indent-arguments-from-line-start
+			     (erlang-indent-parenthesis (nth 2 stack-top))
+			   (let ((previous (erlang-indent-find-preceding-expr))
+				 (stack-pos (nth 2 stack-top)))
+			     (if (>= previous stack-pos) stack-pos
+			       (- (+ previous erlang-argument-indent) 1)))))
 		   	(t
 		   	 (nth 2 stack-top))))
 		 (t 
@@ -2969,11 +2989,16 @@ This assumes that the preceding expression is either simple
            (current-column))
          col)))))
 
-(defun erlang-indent-parenthesis (stack-position) 
+(defun erlang-indent-parenthesis (stack-position)
+  (if erlang-indent-arguments-from-line-start
+      (save-excursion
+	(beginning-of-line)
+	(skip-syntax-forward " ")
+	(+ (current-column) erlang-argument-indent))
   (let ((previous (erlang-indent-find-preceding-expr)))
     (if (> previous stack-position)
-	(+ stack-position erlang-argument-indent)
-      (+ previous erlang-argument-indent))))
+  	(+ stack-position erlang-argument-indent)
+      (+ previous erlang-argument-indent)))))
 
 (defun erlang-skip-blank (&optional lim)
   "Skip over whitespace and comments until limit reached."
