@@ -2764,8 +2764,15 @@ Return nil if inside string, t if in a comment."
 				     ;; Indent to the same column as the first
 				     ;; argument.
 				     (goto-char (1+ (nth 1 stack-top)))
-				     (skip-chars-forward " \t")
-				     (current-column)))))
+				     (if erlang-indent-arguments-from-line-start
+					 (progn
+					   ;; ...except if we want
+					   ;; indentation relative to
+					   ;; start of line.
+					   (back-to-indentation)
+					   (+ (current-column) erlang-argument-indent))
+				       (skip-chars-forward " \t")
+				       (current-column))))))
 		    (erlang-indent-standard indent-point token base 't)))))
 	  ;;
 	  ((eq (car stack-top) '<<)
