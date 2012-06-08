@@ -2661,7 +2661,7 @@ Value is list (stack token-start token-type in-what)."
 	    (forward-char 1)
 	  (erlang-push (list 'icr token (current-column)) stack)
 	  (forward-char 6)))
-       ((looking-at "-spec\\s ")
+       ((looking-at "-spec\\s \\|-callback\\s ")
 	(if stack
 	    (forward-char 1)
 	  (forward-char 6) 
@@ -4078,7 +4078,7 @@ This function is designed to be a member of a criteria list."
 This function is designed to be a member of a criteria list."
   (save-excursion
     (beginning-of-line)
-    (when (save-match-data (looking-at "-\\(spec\\|type\\)"))
+    (when (save-match-data (looking-at "-\\(spec\\|type\\|callback\\)"))
       'stop)))
 
 
