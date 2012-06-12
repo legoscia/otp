@@ -526,8 +526,33 @@ hc(Mod) ->
   case code:is_module_native(Mod) of
     true -> ok;
     false ->
-      {ok, Mod} = hipe:c(Mod),
+      {ok, [[Home]]} = init:get_argument(home),
+      CacheDir = filename:join(Home, ".dialyzer_hipe_cache"),
+      ok = filelib:ensure_dir(CacheDir++"/foo.hipe"),
+      Basename = filename:join(CacheDir, atom_to_list(Mod)),
+      case is_up_to_date(Basename, Mod) of
+	true ->
+	  {ok, HipeBin} = file:read_file(Basename ++ ".hipe"),
+	  {module, Mod} = hipe:do_load(Mod, HipeBin, code:which(Mod));
+	false ->
+	  {ok, {_Target, Binary}} = hipe:compile(Mod, [load]),
+	  Hipe = Basename++".hipe",
+	  io:format("Caching ~p as '~s'...~n", [Mod, Hipe]),
+	  ok = file:write_file(Hipe, Binary)
+      end,
+      true = code:is_module_native(Mod),
       ok
+  end.
+
+is_up_to_date(Basename, Mod) ->
+  {_,_,_,_,_,_} = CompileTime = proplists:get_value(time, Mod:module_info(compile)),
+  case filelib:last_modified(Basename++".hipe") of
+    0 ->
+      %% does not exist
+      false;
+    {{Y,Mo,D},{H,Mi,S}} ->
+      %% reformat and compare
+      CompileTime < {Y,Mo,D,H,Mi,S}
   end.
 
 new_state() ->
