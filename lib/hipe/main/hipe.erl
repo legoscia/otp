@@ -201,6 +201,7 @@
  	 file/1,
  	 file/2,
 	 load/1,
+	 do_load/3,
 	 help/0,
 	 help_hiper/0,
 	 help_options/0,
