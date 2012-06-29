@@ -2550,8 +2550,21 @@ Return nil if line starts inside string, t if in a comment."
 
 
 (defun erlang-partial-parse (from to &optional state)
-  "Parse Erlang syntax starting at FROM until TO, with an optional STATE.
-Value is list (stack token-start token-type in-what)."
+  "Parse Erlang syntax starting at FROM going no further than TO.
+Return updated state, and advance point to position where parsing stopped.
+The final return value can be passed to `erlang-calculate-stack-indent'.
+
+STATE starts out as nil at the first function call, and is then a
+list of the form (STACK TOKEN-START TOKEN-TYPE IN-WHAT).
+STACK is a list where each element is of the form
+\(SYMBOL POSITION COLUMN).  SYMBOL is one of:
+    icr try fun begin when -> || << spec :: \\(
+POSITION and COLUMN are the buffer position and column number,
+respectively, of the token in question.
+TOKEN-START is a buffer position, and TOKEN-TYPE is the
+syntax class of the following character.  IN-WHAT is either
+nil or the symbol `string', depending on whether we're inside
+a string."
   (goto-char from)			; Start at the beginning
   (erlang-skip-blank to)
   (let ((cs (char-syntax (following-char)))
