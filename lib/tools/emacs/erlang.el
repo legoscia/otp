@@ -2886,7 +2886,7 @@ Return nil if inside string, t if in a comment."
 	       (let ((base (erlang-indent-find-base stack indent-point off skip)))
 		 ;; Special cases
 		 (goto-char indent-point)
-		 (cond ((looking-at "\\(end\\|after\\)\\($\\|[^_a-zA-Z0-9]\\)")
+		 (cond ((looking-at "\\(end\\|after\\|;\\|\\.\\|,\\)\\($\\|[^_a-zA-Z0-9]\\)")
 			(if (eq (car stack-top) '->)
 			    (erlang-pop stack))
 			(if stack

@@ -700,3 +700,15 @@ some_function_name_xyz(xyzzy, #some_record{
 			       field2 = Field1,
 			       field2 = Field2}}),
     {ok, SomeVariable}.
+
+function_with_nonstandard_punctuation_placement(x) ->
+    if a == b -> 1
+    ;  b == c -> 2
+    end
+;
+function_with_nonstandard_punctuation_placement(y) ->
+    Fun = fun(a) -> 1
+	  ; (b) -> 2
+	  end,
+    Fun(y)
+.
