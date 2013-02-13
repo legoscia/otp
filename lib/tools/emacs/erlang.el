@@ -2830,33 +2830,37 @@ Return nil if inside string, t if in a comment."
 		  ;; indent to next column.
 		  (1+ (nth 2 stack-top)))
 		 ((= (char-syntax (following-char)) ?\))
+		  ;; Line starts with closing parenthesis.
 		  (goto-char (nth 1 stack-top))
-		  (cond ((looking-at "[({]\\s *\\($\\|%\\)")
-		   	 ;; Line ends with parenthesis.
-			 (if erlang-indent-arguments-from-line-start
-			     (erlang-indent-parenthesis (nth 2 stack-top))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Closing parenthesis has same indentation as
+			;; line that contains opening parenthesis.
+			(back-to-indentation)
+			(current-column))
+		    (cond ((looking-at "[({]\\s *\\($\\|%\\)")
+			   ;; Line ends with parenthesis.
 			   (let ((previous (erlang-indent-find-preceding-expr))
 				 (stack-pos (nth 2 stack-top)))
 			     (if (>= previous stack-pos) stack-pos
-			       (- (+ previous erlang-argument-indent) 1)))))
-		   	(t
-		   	 (nth 2 stack-top))))
+			       (- (+ previous erlang-argument-indent) 1))))
+			  (t
+			   (nth 2 stack-top)))))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  (let ((base (cond ((looking-at "[({]\\s *\\($\\|%\\)")
-				     ;; Line ends with parenthesis.
-				     (erlang-indent-parenthesis (nth 2 stack-top)))
-				    (t
-				     ;; Indent to the same column as the first
-				     ;; argument.
-				     (goto-char (1+ (nth 1 stack-top)))
-				     (if erlang-indent-arguments-from-line-start
-					 (progn
-					   ;; ...except if we want
-					   ;; indentation relative to
-					   ;; start of line.
-					   (back-to-indentation)
-					   (+ (current-column) erlang-argument-indent))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Indent one level more than line containing
+			;; opening parenthesis.
+			(back-to-indentation)
+			(+ (current-column) erlang-argument-indent))
+		    (let ((base (cond ((looking-at "[({]\\s *\\($\\|%\\)")
+				       ;; Line ends with parenthesis.
+				       (erlang-indent-parenthesis (nth 2 stack-top)))
+				      (t
+				       ;; Indent to the same column as the first
+				       ;; argument.
+				       (goto-char (1+ (nth 1 stack-top)))
 				       (skip-chars-forward " \t")
 				       (current-column))))))
 		    (erlang-indent-standard indent-point token base 't)))))
@@ -3124,15 +3128,10 @@ This assumes that the preceding expression is either simple
        col))))
 
 (defun erlang-indent-parenthesis (stack-position)
-  (if erlang-indent-arguments-from-line-start
-      (save-excursion
-	(beginning-of-line)
-	(skip-syntax-forward " ")
-	(+ (current-column) erlang-argument-indent))
   (let ((previous (erlang-indent-find-preceding-expr)))
     (if (> previous stack-position)
   	(+ stack-position erlang-argument-indent)
-      (+ previous erlang-argument-indent)))))
+      (+ previous erlang-argument-indent))))
 
 (defun erlang-skip-blank (&optional lim)
   "Skip over whitespace and comments until limit reached."
