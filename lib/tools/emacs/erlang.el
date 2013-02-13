@@ -2870,11 +2870,16 @@ Return nil if inside string, t if in a comment."
 		  (nth 2 stack-top))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  ;; Indent to the same column as the first
-		  ;; argument.
-		  (goto-char (+ 2 (nth 1 stack-top)))
-		  (skip-chars-forward " \t")
-		  (current-column))))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Indent one level more than '<<'
+			(back-to-indentation)
+			(+ (current-column) erlang-argument-indent))
+		    ;; Indent to the same column as the first
+		    ;; argument.
+		    (goto-char (+ 2 (nth 1 stack-top)))
+		    (skip-chars-forward " \t")
+		    (current-column)))))
 	  
           ((memq (car stack-top) '(icr fun spec))
            ;; The default indentation is the column of the option
