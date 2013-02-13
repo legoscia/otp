@@ -2902,13 +2902,18 @@ Return nil if inside string, t if in a comment."
 		 (t
 		  (save-excursion
 		    (goto-char (nth 1 stack-top))
-		    (if (looking-at "case[^_a-zA-Z0-9]")
-			(+ (nth 2 stack-top) erlang-indent-level)
-		      (skip-chars-forward "a-z")
-		      (skip-chars-forward " \t")
-		      (if (memq (following-char) '(?% ?\n))
+		    (if erlang-indent-arguments-from-line-start
+			;; Don't align?  Just indent by one level.
+			(progn
+			  (back-to-indentation)
+			  (+ (current-column) erlang-indent-level))
+		      (if (looking-at "case[^_a-zA-Z0-9]")
 			  (+ (nth 2 stack-top) erlang-indent-level)
-			(current-column))))))
+			(skip-chars-forward "a-z")
+			(skip-chars-forward " \t")
+			(if (memq (following-char) '(?% ?\n))
+			    (+ (nth 2 stack-top) erlang-indent-level)
+			  (current-column)))))))
            )
 	  ((and (eq (car stack-top) '||) (looking-at "\\(]\\|>>\\)[^_a-zA-Z0-9]"))
 	   (nth 2 (car (cdr stack))))
