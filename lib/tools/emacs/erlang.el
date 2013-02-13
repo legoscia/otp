@@ -2958,7 +2958,16 @@ Return nil if inside string, t if in a comment."
 				   (if (eq (car stack-top) '->)
 				       (erlang-pop stack))
 				   (if stack
-				       (erlang-caddr (car stack))
+				       (if erlang-indent-arguments-from-line-start
+					   (progn
+					     (back-to-indentation)
+					     ;; is the 'try' the first thing on the line?
+					     (if (looking-at "try\\($\\|[^_a-zA-Z0-9]\\)")
+						 ;; if so, indent 'catch' to the same level as 'try'
+						 (current-column)
+					       ;; if not, indent 'catch' to the start of that line + one level
+					       (+ (current-column) erlang-indent-level)))
+					 (erlang-caddr (car stack)))
 				     0)))
 				(t (erlang-indent-standard indent-point token base 'nil))))) ;; old catch
 		       (t 
