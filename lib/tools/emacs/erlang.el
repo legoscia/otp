@@ -2757,36 +2757,40 @@ Return nil if inside string, t if in a comment."
 		  ;; indent to next column.
 		  (1+ (nth 2 stack-top)))
 		 ((= (char-syntax (following-char)) ?\))
+		  ;; Line starts with closing parenthesis.
 		  (goto-char (nth 1 stack-top))
-		  (cond ((looking-at "[({]\\s *\\($\\|%\\)")
-		   	 ;; Line ends with parenthesis.
-			 (if erlang-indent-arguments-from-line-start
-			     (erlang-indent-parenthesis (nth 2 stack-top))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Closing parenthesis has same indentation as
+			;; line that contains opening parenthesis.
+			(back-to-indentation)
+			(current-column))
+		    (cond ((looking-at "[({]\\s *\\($\\|%\\)")
+			   ;; Line ends with parenthesis.
 			   (let ((previous (erlang-indent-find-preceding-expr))
 				 (stack-pos (nth 2 stack-top)))
 			     (if (>= previous stack-pos) stack-pos
-			       (- (+ previous erlang-argument-indent) 1)))))
-		   	(t
-		   	 (nth 2 stack-top))))
+			       (- (+ previous erlang-argument-indent) 1))))
+			  (t
+			   (nth 2 stack-top)))))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  (let ((base (cond ((looking-at "[({]\\s *\\($\\|%\\)")
-				     ;; Line ends with parenthesis.
-				     (erlang-indent-parenthesis (nth 2 stack-top)))
-				    (t
-				     ;; Indent to the same column as the first
-				     ;; argument.
-				     (goto-char (1+ (nth 1 stack-top)))
-				     (if erlang-indent-arguments-from-line-start
-					 (progn
-					   ;; ...except if we want
-					   ;; indentation relative to
-					   ;; start of line.
-					   (back-to-indentation)
-					   (+ (current-column) erlang-argument-indent))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Indent one level more than line containing
+			;; opening parenthesis.
+			(back-to-indentation)
+			(+ (current-column) erlang-argument-indent))
+		    (let ((base (cond ((looking-at "[({]\\s *\\($\\|%\\)")
+				       ;; Line ends with parenthesis.
+				       (erlang-indent-parenthesis (nth 2 stack-top)))
+				      (t
+				       ;; Indent to the same column as the first
+				       ;; argument.
+				       (goto-char (1+ (nth 1 stack-top)))
 				       (skip-chars-forward " \t")
-				       (current-column))))))
-		    (erlang-indent-standard indent-point token base 't)))))
+				       (current-column)))))
+		      (erlang-indent-standard indent-point token base 't))))))
 	  ;;
 	  ((eq (car stack-top) '<<)
 	   ;; Element of binary (possible comprehension) expression,
@@ -2797,11 +2801,16 @@ Return nil if inside string, t if in a comment."
 		  (nth 2 stack-top))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  ;; Indent to the same column as the first
-		  ;; argument.
-		  (goto-char (+ 2 (nth 1 stack-top)))
-		  (skip-chars-forward " \t")
-		  (current-column))))
+		  (if erlang-indent-arguments-from-line-start
+		      (progn
+			;; Indent one level more than '<<'
+			(back-to-indentation)
+			(+ (current-column) erlang-argument-indent))
+		    ;; Indent to the same column as the first
+		    ;; argument.
+		    (goto-char (+ 2 (nth 1 stack-top)))
+		    (skip-chars-forward " \t")
+		    (current-column)))))
 	  
           ((memq (car stack-top) '(icr fun spec))
            ;; The default indentation is the column of the option
@@ -2820,13 +2829,18 @@ Return nil if inside string, t if in a comment."
 		 (t
 		  (save-excursion
 		    (goto-char (nth 1 stack-top))
-		    (if (looking-at "case[^_a-zA-Z0-9]")
-			(+ (nth 2 stack-top) erlang-indent-level)
-		      (skip-chars-forward "a-z")
-		      (skip-chars-forward " \t")
-		      (if (memq (following-char) '(?% ?\n))
+		    (if erlang-indent-arguments-from-line-start
+			;; Don't align?  Just indent by one level.
+			(progn
+			  (back-to-indentation)
+			  (+ (current-column) erlang-indent-level))
+		      (if (looking-at "case[^_a-zA-Z0-9]")
 			  (+ (nth 2 stack-top) erlang-indent-level)
-			(current-column))))))
+			(skip-chars-forward "a-z")
+			(skip-chars-forward " \t")
+			(if (memq (following-char) '(?% ?\n))
+			    (+ (nth 2 stack-top) erlang-indent-level)
+			  (current-column)))))))
            )
 	  ((and (eq (car stack-top) '||) (looking-at "\\(]\\|>>\\)[^_a-zA-Z0-9]"))
 	   (nth 2 (car (cdr stack))))
@@ -2853,11 +2867,22 @@ Return nil if inside string, t if in a comment."
 	       (let ((base (erlang-indent-find-base stack indent-point off skip)))
 		 ;; Special cases
 		 (goto-char indent-point)
-		 (cond ((looking-at "\\(end\\|after\\)\\($\\|[^_a-zA-Z0-9]\\)")
+		 (cond ((looking-at "\\(end\\|after\\|;\\|\\.\\|,\\)\\($\\|[^_a-zA-Z0-9]\\)")
 			(if (eq (car stack-top) '->)
 			    (erlang-pop stack))
 			(if stack
-			    (erlang-caddr (car stack))
+			    (if erlang-indent-arguments-from-line-start
+				(progn
+				  (goto-char (nth 1 (car stack)))
+				  ;; If the corresponding start token
+				  ;; didn't start at the beginning of
+				  ;; the line, indent the end token by
+				  ;; one level.
+				  (back-to-indentation)
+				  (if (= (point) (nth 1 (car stack)))
+				      (current-column)
+				    (+ (current-column) erlang-indent-level)))
+			      (erlang-caddr (car stack)))
 			  0))
 		       ((looking-at "catch\\($\\|[^_a-zA-Z0-9]\\)")
 			;; Are we in a try
@@ -2871,10 +2896,19 @@ Return nil if inside string, t if in a comment."
 				   (if (eq (car stack-top) '->)
 				       (erlang-pop stack))
 				   (if stack
-				       (erlang-caddr (car stack))
+				       (if erlang-indent-arguments-from-line-start
+					   (progn
+					     (back-to-indentation)
+					     ;; is the 'try' the first thing on the line?
+					     (if (looking-at "try\\($\\|[^_a-zA-Z0-9]\\)")
+						 ;; if so, indent 'catch' to the same level as 'try'
+						 (current-column)
+					       ;; if not, indent 'catch' to the start of that line + one level
+					       (+ (current-column) erlang-indent-level)))
+					 (erlang-caddr (car stack)))
 				     0)))
 				(t (erlang-indent-standard indent-point token base 'nil))))) ;; old catch
-		       (t 
+		       (t
 			(erlang-indent-standard indent-point token base 'nil)
 			))))
 	     ))
@@ -2938,7 +2972,11 @@ Return nil if inside string, t if in a comment."
   (cond ((looking-at "||\\|,\\|->\\||")
 	 base)
 	((erlang-at-keyword)
-	 (+ (current-column) erlang-indent-level))
+	 (+
+	  (if erlang-indent-arguments-from-line-start
+	      (progn (back-to-indentation) (current-column))
+	    (current-column))
+	  erlang-indent-level))
 	((or (= (char-syntax (following-char)) ?.)
 	     (erlang-at-operator))
 	 (+ base erlang-indent-level))
@@ -2980,8 +3018,13 @@ Return nil if inside string, t if in a comment."
 		  ;; Take parent identation + offset,
 		  ;; else just erlang-indent-level if no parent
 		  (if stack
-		      (+ (erlang-caddr (car stack))
-			 offset)
+		      (if erlang-indent-arguments-from-line-start
+			(progn
+			  (goto-char (cadr (car stack)))
+			  (back-to-indentation)
+			  (+ (current-column) offset))
+			(+ (erlang-caddr (car stack))
+			   offset))
 		    erlang-indent-level))
 	      (erlang-skip-blank indent-point)
 	      (current-column)))
@@ -2996,7 +3039,12 @@ This assumes that the preceding expression is either simple
   (save-excursion
     (or arg (setq arg 1))
     (forward-sexp (- arg))
-    (let ((col (current-column)))
+    (let ((col
+	   (if erlang-indent-arguments-from-line-start
+	       (save-excursion
+		 (back-to-indentation)
+		 (current-column))
+	       (current-column))))
       (skip-chars-backward " \t")
       ;; Special hack to handle: (note line break)
       ;; [#myrecord{
@@ -3046,15 +3094,10 @@ This assumes that the preceding expression is either simple
        col))))
 
 (defun erlang-indent-parenthesis (stack-position)
-  (if erlang-indent-arguments-from-line-start
-      (save-excursion
-	(beginning-of-line)
-	(skip-syntax-forward " ")
-	(+ (current-column) erlang-argument-indent))
   (let ((previous (erlang-indent-find-preceding-expr)))
     (if (> previous stack-position)
   	(+ stack-position erlang-argument-indent)
-      (+ previous erlang-argument-indent)))))
+      (+ previous erlang-argument-indent))))
 
 (defun erlang-skip-blank (&optional lim)
   "Skip over whitespace and comments until limit reached."
