@@ -479,12 +479,14 @@ When nil, indent to the column after the `(' of the
 function.")
 (put 'erlang-argument-indent 'safe-local-variable '(lambda (val) (or (null val) (integerp val))))
 
-(defvar erlang-indent-arguments-from-line-start nil
-  "*If non-nil, `erlang-argument-indent' applies from start of previous line.
-Otherwise, it applies from the start of the function name.
+(defvar erlang-indent-never-align nil
+  "*If non-nil, always indent by indentation steps.
 
-That is, for an `erlang-argument-indent' of 8, setting this
-variable to t will get you this:
+For function arguments not on the same line as the function name,
+a non-nil value means that `erlang-argument-indent' applies from
+start of previous line.  Otherwise, it applies from the start of
+the function name.  That is, for an `erlang-argument-indent' of
+8, setting this variable to t will get you this:
 
 case myfunction(
         bar) of
@@ -495,7 +497,7 @@ instead of this:
 case myfunction(
              bar) of
      ...")
-(put 'erlang-indent-arguments-from-line-start 'safe-local-variable 'booleanp)
+(put 'erlang-indent-never-align 'safe-local-variable 'booleanp)
 
 (defvar erlang-tab-always-indent t
   "*Non-nil means TAB in Erlang mode should always re-indent the current line,
@@ -2759,7 +2761,7 @@ Return nil if inside string, t if in a comment."
 		 ((= (char-syntax (following-char)) ?\))
 		  ;; Line starts with closing parenthesis.
 		  (goto-char (nth 1 stack-top))
-		  (if erlang-indent-arguments-from-line-start
+		  (if erlang-indent-never-align
 		      (progn
 			;; Closing parenthesis has same indentation as
 			;; line that contains opening parenthesis.
@@ -2775,7 +2777,7 @@ Return nil if inside string, t if in a comment."
 			   (nth 2 stack-top)))))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  (if erlang-indent-arguments-from-line-start
+		  (if erlang-indent-never-align
 		      (progn
 			;; Indent one level more than line containing
 			;; opening parenthesis.
@@ -2801,7 +2803,7 @@ Return nil if inside string, t if in a comment."
 		  (nth 2 stack-top))
 		 (t 
 		  (goto-char (nth 1 stack-top))
-		  (if erlang-indent-arguments-from-line-start
+		  (if erlang-indent-never-align
 		      (progn
 			;; Indent one level more than '<<'
 			(back-to-indentation)
@@ -2829,7 +2831,7 @@ Return nil if inside string, t if in a comment."
 		 (t
 		  (save-excursion
 		    (goto-char (nth 1 stack-top))
-		    (if erlang-indent-arguments-from-line-start
+		    (if erlang-indent-never-align
 			;; Don't align?  Just indent by one level.
 			(progn
 			  (back-to-indentation)
@@ -2871,7 +2873,7 @@ Return nil if inside string, t if in a comment."
 			(if (eq (car stack-top) '->)
 			    (erlang-pop stack))
 			(if stack
-			    (if erlang-indent-arguments-from-line-start
+			    (if erlang-indent-never-align
 				(progn
 				  (goto-char (nth 1 (car stack)))
 				  ;; If the corresponding start token
@@ -2896,7 +2898,7 @@ Return nil if inside string, t if in a comment."
 				   (if (eq (car stack-top) '->)
 				       (erlang-pop stack))
 				   (if stack
-				       (if erlang-indent-arguments-from-line-start
+				       (if erlang-indent-never-align
 					   (progn
 					     (back-to-indentation)
 					     ;; is the 'try' the first thing on the line?
@@ -2973,7 +2975,7 @@ Return nil if inside string, t if in a comment."
 	 base)
 	((erlang-at-keyword)
 	 (+
-	  (if erlang-indent-arguments-from-line-start
+	  (if erlang-indent-never-align
 	      (progn (back-to-indentation) (current-column))
 	    (current-column))
 	  erlang-indent-level))
@@ -3018,7 +3020,7 @@ Return nil if inside string, t if in a comment."
 		  ;; Take parent identation + offset,
 		  ;; else just erlang-indent-level if no parent
 		  (if stack
-		      (if erlang-indent-arguments-from-line-start
+		      (if erlang-indent-never-align
 			(progn
 			  (goto-char (cadr (car stack)))
 			  (back-to-indentation)
@@ -3040,7 +3042,7 @@ This assumes that the preceding expression is either simple
     (or arg (setq arg 1))
     (forward-sexp (- arg))
     (let ((col
-	   (if erlang-indent-arguments-from-line-start
+	   (if erlang-indent-never-align
 	       (save-excursion
 		 (back-to-indentation)
 		 (current-column))
