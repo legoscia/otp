@@ -731,3 +731,18 @@ commas_first() ->
             ] }
 ]
 }.
+
+semicolons_and_dots_first(foo) ->
+ if A ->
+ do_something
+ ; B ->
+ do_something_else
+ end
+;
+semicolons_and_dots_first(bar) ->
+ fun(x) ->
+ yes
+ ; (y) ->
+ no
+ end
+.
