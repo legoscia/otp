@@ -2429,6 +2429,10 @@ Return the amount the indentation changed by."
 
 This is automagically called by the user level function `indent-region'."
   (interactive "r")
+  ;; Since we depend on font-lock-syntactic-keywords for handling
+  ;; dollar signs in certain combinations with quotation marks, ensure
+  ;; that the region we are going to indent has been fontified.
+  (font-lock-fontify-region beg end)
   (save-excursion
     (let ((case-fold-search nil)
 	  (continue t)

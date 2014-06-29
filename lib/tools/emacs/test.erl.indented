@@ -210,12 +210,15 @@ highlighting(X)			  % Function definitions should be highlighted
     $", atom,					% atom should be ok
     $', atom, 
 
-    "string$", atom,  "string$", atom,  		% currently buggy I know...
-    "string\$", atom,   				% workaround for bug above
+    %% Test dollar signs before quotation marks
+    "string$", atom,
+    "string$", atom,
+    "string\$", atom,
 
     "char $in string", atom, 
 
-    'atom$', atom,  'atom$', atom,
+    'atom$', atom,
+    'atom$', atom,
     'atom\$', atom,
 
     'char $in atom', atom,
