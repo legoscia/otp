@@ -110,9 +110,9 @@
 #  include <sys/time.h>
 #  include <unistd.h>
 #  include <signal.h>
+#  include <limits.h>
 #  if defined(OS_MONOTONIC_TIME_USING_TIMES)
 #    include <sys/times.h>
-#    include <limits.h>
 #  endif
 #endif
 
@@ -205,6 +205,11 @@ static HANDLE start_reader_thread(void);
 static DWORD WINAPI reader(LPVOID);
 #define read _read
 #define write _write
+#endif
+
+#ifdef __linux__
+static void oom_adjust_restore(void);
+static void oom_adjust_setup(void);
 #endif
 
 /*  static variables */
@@ -372,6 +377,9 @@ int main(int argc, char **argv) {
     _setmode(erlin_fd,_O_BINARY);
     _setmode(erlout_fd,_O_BINARY);
 #endif
+#ifdef __linux__
+    oom_adjust_setup();
+#endif
     strncpy(program_name, argv[0], sizeof(program_name));
     program_name[sizeof(program_name)-1] = '\0';
     notify_ack(erlout_fd);
@@ -458,13 +466,20 @@ message_loop(erlin_fd, erlout_fd)
     /*
      * Message from ERLANG
      */
+	if (
 #ifdef __WIN32__
-	if (wresult == WAIT_OBJECT_0) {
-		if (tlen < 0) {
+	    wresult == WAIT_OBJECT_0
 #else
-    if (FD_ISSET(erlin_fd, &read_fds)) {
-		if ((tlen = read_message(erlin_fd, mp)) < 0) {
+	    FD_ISSET(erlin_fd, &read_fds)
 #endif
+	    ) {
+		if (
+#ifdef __WIN32__
+		    tlen < 0
+#else
+		    (tlen = read_message(erlin_fd, mp)) < 0
+#endif
+		    ) {
 			print_error("error in read_message.");
 			return R_ERROR;
 		}
@@ -718,12 +733,18 @@ do_terminate(int erlin_fd, int reason) {
 		print_error("Would reboot. Terminating.");
 	    else {
 		kill_old_erlang();
+#ifdef __linux__
+		oom_adjust_restore();
+#endif
 		ret = system(command);
 		print_error("Executed \"%s\" -> %d. Terminating.",command, ret);
 	    }
 	    free_env_val(command);
 	} else {
 	    kill_old_erlang();
+#ifdef __linux__
+	    oom_adjust_restore();
+#endif
 	    ret = system((char*)&cmd[0]);
 	    print_error("Executed \"%s\" -> %d. Terminating.",cmd, ret);
 	}
@@ -1182,4 +1203,81 @@ time_t timestamp(time_t *res)
     return time(res);
 }
 
+#endif
+
+#ifdef __linux__
+/*
+ * Adjust the OOM killer to avoid killing the heart process.
+ * This code was taken from OpenSSH, openbsd-compat/port-linux.c.
+ *
+ * Note that this will normally not take effect, unless heart is
+ * being run as root, or has the CAP_SYS_RESOURCE capability.
+ * 
+ * The magic "don't kill me" values, old and new, as documented in eg:
+ * http://lxr.linux.no/#linux+v2.6.32/Documentation/filesystems/proc.txt
+ * http://lxr.linux.no/#linux+v2.6.36/Documentation/filesystems/proc.txt
+ */
+
+static int oom_adj_save = INT_MIN;
+static char *oom_adj_path = NULL;
+struct {
+  char *path;
+  int value;
+} oom_adjust[] = {
+  {"/proc/self/oom_score_adj", -1000},	/* kernels >= 2.6.36 */
+  {"/proc/self/oom_adj", -17},		/* kernels <= 2.6.35 */
+  {NULL, 0},
+};
+
+/*
+ * Tell the kernel's out-of-memory killer to avoid heart.
+ * Returns the previous oom_adj value or zero.
+ */
+void oom_adjust_setup(void)
+{
+  int i, value;
+  FILE *fp;
+
+  debugf("%s", __func__);
+  for (i = 0; oom_adjust[i].path != NULL; i++) {
+    oom_adj_path = oom_adjust[i].path;
+    value = oom_adjust[i].value;
+    if ((fp = fopen(oom_adj_path, "r+")) != NULL) {
+      if (fscanf(fp, "%d", &oom_adj_save) != 1)
+	debugf("error reading %s: %s", oom_adj_path,
+	       strerror(errno));
+      else {
+	rewind(fp);
+	if (fprintf(fp, "%d\n", value) <= 0)
+	  debugf("error writing %s: %s",
+		 oom_adj_path, strerror(errno));
+	else
+	  debugf("Set %s from %d to %d",
+		 oom_adj_path, oom_adj_save, value);
+      }
+      fclose(fp);
+      return;
+    }
+  }
+  oom_adj_path = NULL;
+}
+
+/* Restore the saved OOM adjustment */
+void oom_adjust_restore(void)
+{
+  FILE *fp;
+
+  debugf("%s", __func__);
+  if (oom_adj_save == INT_MIN || oom_adj_path == NULL ||
+      (fp = fopen(oom_adj_path, "w")) == NULL)
+    return;
+
+  if (fprintf(fp, "%d\n", oom_adj_save) <= 0)
+    debugf("error writing %s: %s", oom_adj_path, strerror(errno));
+  else
+    debugf("Set %s to %d", oom_adj_path, oom_adj_save);
+
+  fclose(fp);
+  return;
+}
 #endif
