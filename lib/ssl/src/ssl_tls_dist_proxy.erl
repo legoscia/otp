@@ -354,6 +354,20 @@ ssl_options(server, ["server_verify", Value|T]) ->
     [{verify, atomize(Value)} | ssl_options(server,T)];
 ssl_options(client, ["client_verify", Value|T]) ->
     [{verify, atomize(Value)} | ssl_options(client,T)];
+ssl_options(server, ["server_verify_fun", Value|T]) ->
+    {ModuleS, ":"++FunctionS} = lists:splitwith(fun(C) -> C =/= $: end, Value),
+    Module = atomize(ModuleS),
+    Function = atomize(FunctionS),
+    Fun = fun Module:Function/3,
+    %% XXX: do something sensible for state data
+    [{verify_fun, {Fun, {}}} | ssl_options(server,T)]; 
+ssl_options(client, ["client_verify_fun", Value|T]) ->
+    {ModuleS, ":"++FunctionS} = lists:splitwith(fun(C) -> C =/= $: end, Value),
+    Module = atomize(ModuleS),
+    Function = atomize(FunctionS),
+    Fun = fun Module:Function/3,
+    %% XXX: do something sensible for state data
+    [{verify_fun, {Fun, {}}} | ssl_options(client,T)]; 
 ssl_options(server, ["server_reuse_sessions", Value|T]) ->
     [{reuse_sessions, atomize(Value)} | ssl_options(server,T)];
 ssl_options(client, ["client_reuse_sessions", Value|T]) ->
