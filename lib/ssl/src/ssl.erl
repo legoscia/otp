@@ -1278,6 +1278,9 @@ handle_verify_options(Opts, CaCerts) ->
     DefaultVerifyNoneFun =
 	{fun(_,{bad_cert, _}, UserState) ->
 		 {valid, UserState};
+	    (_,{extension, #'Extension'{critical = true} = Extension}, UserState) ->
+                 error_logger:info_report([{ignoring_critical_extension, Extension}]),
+	         {valid, UserState};
 	    (_,{extension, _}, UserState) ->
 		 {unknown, UserState};
 	    (_, valid, UserState) ->

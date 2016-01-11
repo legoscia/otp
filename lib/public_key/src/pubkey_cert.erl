@@ -321,7 +321,11 @@ verify_fun(Otpcert, Result, UserState0, VerifyFun) ->
 	    end;
 	{unknown, UserState} ->
 	    case Result of
-		{extension, #'Extension'{critical = true}} ->
+		{extension, #'Extension'{critical = true} = Extension} ->
+                    error_logger:error_report(
+                      [{unknown_critical_extension, Extension},
+                       {subject, Otpcert#'OTPCertificate'.tbsCertificate#'OTPTBSCertificate'.subject},
+                       {issuer, Otpcert#'OTPCertificate'.tbsCertificate#'OTPTBSCertificate'.issuer}]),
 		    throw({bad_cert, unknown_critical_extension});
 		_ ->
 		    UserState
