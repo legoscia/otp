@@ -2073,7 +2073,7 @@ crl_check(OtpCert, Check, CertDbHandle, CertDbRef, {Callback, CRLDbHandle}, _) -
     case dps_and_crls(OtpCert, Callback, CRLDbHandle, ext) of
 	no_dps ->
 	    case dps_and_crls(OtpCert, Callback, CRLDbHandle, same_issuer) of
-		[] ->
+		[] when Check =:= best_effort ->
 		    valid; %% No relevant CRL existed
 		DpsAndCRls ->
 		    crl_check_same_issuer(OtpCert, Check, DpsAndCRls, Options)		
