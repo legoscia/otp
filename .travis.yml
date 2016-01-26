@@ -32,7 +32,8 @@ script:
   - ./otp_build all -a
   
 after_success:
-  - ./otp_build tests && make release_docs
+  - ./otp_build tests
+  # && make release_docs
 
 after_script:
   - cd $ERL_TOP/release/tests/test_server && $ERL_TOP/bin/erl -s ts install -eval 'ok = ts:run(ssl, [batch])' -s init stop
