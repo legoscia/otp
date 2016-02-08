@@ -89,6 +89,14 @@ listen_options(Opts0) ->
             Opts1
     end.
 
+connect_options(Opts) ->
+    case application:get_env(kernel, inet_dist_connect_options) of
+	{ok,ConnectOpts} ->
+	    lists:ukeysort(1, ConnectOpts ++ Opts);
+	_ ->
+	    Opts
+    end.
+
 %%====================================================================
 %% gen_server callbacks
 %%====================================================================
@@ -101,7 +109,7 @@ init([]) ->
     {ok, #state{}}.
 
 handle_call({listen, Name}, _From, State) ->
-    case gen_tcp:listen(0, [{active, false}, {packet,?PPRE}]) of
+    case gen_tcp:listen(0, [{active, false}, {packet,?PPRE}, {ip, loopback}]) of
 	{ok, Socket} ->
 	    {ok, World} = do_listen([{active, false}, binary, {packet,?PPRE}, {reuseaddr, true}]),
 	    {ok, TcpAddress} = get_tcp_address(Socket),
@@ -186,6 +194,11 @@ accept_loop(Proxy, erts = Type, Listen, Extra) ->
 		{_Kernel, unsupported_protocol} ->
 		    exit(unsupported_protocol)
 	    end;
+	{error, closed} ->
+	    %% The listening socket is closed: the proxy process is
+	    %% shutting down.  Exit normally, to avoid generating a
+	    %% spurious error report.
+	    exit(normal);
 	Error ->
 	    exit(Error)
     end,
@@ -196,6 +209,7 @@ accept_loop(Proxy, world = Type, Listen, Extra) ->
     case gen_tcp:accept(Listen) of
 	{ok, Socket} ->
 	    Opts = get_ssl_options(server),
+	    wait_for_code_server(),
 	    case ssl:ssl_accept(Socket, Opts) of
 		{ok, SslSocket} ->
 		    PairHandler =
@@ -217,6 +231,35 @@ accept_loop(Proxy, world = Type, Listen, Extra) ->
     end,
     accept_loop(Proxy, Type, Listen, Extra).
 
+wait_for_code_server() ->
+    %% This is an ugly hack.  Upgrading a socket to TLS requires the
+    %% crypto module to be loaded.  Loading the crypto module triggers
+    %% its on_load function, which calls code:priv_dir/1 to find the
+    %% directory where its NIF library is.  However, distribution is
+    %% started earlier than the code server, so the code server is not
+    %% necessarily started yet, and code:priv_dir/1 might fail because
+    %% of that, if we receive an incoming connection on the
+    %% distribution port early enough.
+    %%
+    %% If the on_load function of a module fails, the module is
+    %% unloaded, and the function call that triggered loading it fails
+    %% with 'undef', which is rather confusing.
+    %%
+    %% Thus, the ssl_tls_dist_proxy process will terminate, and be
+    %% restarted by ssl_dist_sup.  However, it won't have any memory
+    %% of being asked by net_kernel to listen for incoming
+    %% connections.  Hence, the node will believe that it's open for
+    %% distribution, but it actually isn't.
+    %%
+    %% So let's avoid that by waiting for the code server to start.
+    case whereis(code_server) of
+	undefined ->
+	    timer:sleep(10),
+	    wait_for_code_server();
+	Pid when is_pid(Pid) ->
+	    ok
+    end.
+
 try_connect(Port) ->
     case gen_tcp:connect({127,0,0,1}, Port, [{active, false}, {packet,?PPRE}, nodelay()]) of
 	R = {ok, _S} ->
@@ -227,10 +270,10 @@ try_connect(Port) ->
 
 setup_proxy(Ip, Port, Parent) ->
     process_flag(trap_exit, true),
-    Opts = get_ssl_options(client),
+    Opts = connect_options(get_ssl_options(client)),
     case ssl:connect(Ip, Port, [{active, true}, binary, {packet,?PPRE}, nodelay()] ++ Opts) of
 	{ok, World} ->
-	    {ok, ErtsL} = gen_tcp:listen(0, [{active, true}, {ip, {127,0,0,1}}, binary, {packet,?PPRE}]),
+	    {ok, ErtsL} = gen_tcp:listen(0, [{active, true}, {ip, loopback}, binary, {packet,?PPRE}]),
 	    {ok, #net_address{address={_,LPort}}} = get_tcp_address(ErtsL),
 	    Parent ! {self(), go_ahead, LPort},
 	    case gen_tcp:accept(ErtsL) of
