@@ -395,8 +395,8 @@ erts_sys_pre_init(void)
     erts_thr_init_data_t eid = ERTS_THR_INIT_DATA_DEF_INITER;
 #endif
 
-    erts_printf_add_cr_to_stdout = 1;
-    erts_printf_add_cr_to_stderr = 1;
+    erts_printf_add_cr_to_stdout = 0;
+    erts_printf_add_cr_to_stderr = 0;
 
 #ifdef USE_THREADS
 
