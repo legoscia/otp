@@ -41,10 +41,11 @@
 %% Common Test interface functions -----------------------------------
 %%--------------------------------------------------------------------
 all() ->
-    [basic, payload, plain_options, plain_verify_options, nodelay_option, 
-     listen_port_options, listen_options, connect_options, use_interface,
-     verify_fun_fail, verify_fun_pass, crl_check_pass, crl_check_fail,
-     crl_check_best_effort, crl_cache_check_pass, crl_cache_check_fail].
+    [basic, payload, plain_options, plain_verify_options, client_eccs_option,
+     server_eccs_option, nodelay_option, listen_port_options, listen_options,
+     connect_options, use_interface, verify_fun_fail, verify_fun_pass,
+     crl_check_pass, crl_check_fail, crl_check_best_effort,
+     crl_cache_check_pass, crl_cache_check_fail].
 
 groups() ->
     [].
@@ -244,6 +245,34 @@ plain_verify_options_test(NH1, NH2, _) ->
     [Node2] = apply_on_ssl_node(NH1, fun () -> nodes() end),
     [Node1] = apply_on_ssl_node(NH2, fun () -> nodes() end).
 
+%%--------------------------------------------------------------------
+client_eccs_option() ->
+    [{doc,"Test the client_eccs option"}].
+client_eccs_option(Config) when is_list(Config) ->
+    [Curve | _] = ssl:eccs(),
+    DistOpts = "-ssl_dist_opt client_eccs " ++ atom_to_list(Curve),
+    NewConfig = [{configured_curve, Curve}, {additional_dist_opts, DistOpts} | Config],
+    gen_dist_test(eccs_option_test, NewConfig).
+
+%%--------------------------------------------------------------------
+server_eccs_option() ->
+    [{doc,"Test the server_eccs option"}].
+server_eccs_option(Config) when is_list(Config) ->
+    [Curve | _] = ssl:eccs(),
+    DistOpts = "-ssl_dist_opt server_eccs " ++ atom_to_list(Curve),
+    NewConfig = [{configured_curve, Curve}, {additional_dist_opts, DistOpts} | Config],
+    gen_dist_test(eccs_option_test, NewConfig).
+
+eccs_option_test(NH1, _NH2, Config) ->
+    [{_, ConnectionPid, _, _}] =
+	apply_on_ssl_node(NH1, fun () ->
+				       supervisor:which_children(ssl_connection_sup_dist)
+			       end),
+    {ok, [{ecc, ChosenCurve}]} =
+	apply_on_ssl_node(NH1, fun () ->
+				       ssl_connection:connection_information(ConnectionPid)
+			       end),
+    ChosenCurve = proplists:get_value(configured_curve, Config).
 
 %%--------------------------------------------------------------------
 nodelay_option() ->
