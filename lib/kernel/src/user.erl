@@ -50,6 +50,15 @@ start_out() ->
     start_port([out,binary]).
 
 start_port(PortSettings) ->
+    %% Check whether the -remsh option was passed. It is not supported
+    %% for the "old" shell. Let's crash noisily instead of leaving the
+    %% user wondering why it didn't have any effect.
+    case init:get_argument(remsh) of
+        error -> ok;
+        {ok, _} ->
+            error(remsh_not_supported_in_old_shell)
+    end,
+
     Id = spawn(fun() -> server({fd,0,1}, PortSettings) end),
     register(?NAME, Id),
     Id.
